@@ -3,8 +3,10 @@ Some example classes for people who want to create a homemade bot.
 
 With these classes, bot makers will not have to implement the UCI or XBoard interfaces themselves.
 """
+from typing import Tuple
 import chess
 from chess.engine import PlayResult, Limit
+import math
 import random
 from lib.engine_wrapper import MinimalEngine
 from lib.lichess_types import MOVE, HOMEMADE_ARGS_TYPE
@@ -20,6 +22,64 @@ logger = logging.getLogger(__name__)
 class ExampleEngine(MinimalEngine):
     """An example engine that all homemade engines inherit."""
 
+# An iterated version of RandomMove.
+class IteratedRandomMove(ExampleEngine):
+    """Explores the game tree exhaustively to a certain depth.
+
+    The leaves are rated 1.0 for a win of the current player, 0.0 for a draw, and -1.0 for a loss.
+    An inner node gets the flipped evaluation v_i of each move.
+    The frequency of picking move i is h_i = exp(k * v_i), where k is a parameter.
+    The probability of picking move i is h_i / sum(h_i).
+    The evaluation of the node is then the expected value, so sum(h_i * v_i) / sum(h_i).
+    """
+
+    visited = 0
+
+    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
+        """Choose a random move according to the distribution generated from iterative evaluation."""
+        k = math.log(10)
+        depth = 3
+
+        self.visited = 0
+        (moves, values, weighted, total) = self.policy(board, depth, k)
+        logger.info(f"Visited {self.visited} nodes.")
+
+        policy = {moves[i]: weighted[i] / total for i in range(len(moves))}
+        logger.info(f"Policy: {policy}")
+
+        [move] = random.choices(population=moves, weights=weighted, k=1)
+        logger.info(f"Move: {move}")
+
+        return PlayResult(move, None)
+
+
+    def value(self, board: chess.Board, depth: int, k: float) -> float:
+        self.visited += 1
+        outcome = board.outcome()
+        if outcome is not None:
+            if outcome.winner is None:
+                return 0.0
+            if outcome.winner == board.turn:
+                return 1.0
+            return -1.0
+        if depth <= 0:
+            return 0.0
+        (moves, values, weighted, total) = self.policy(board, depth-1, k)
+        v = sum(weighted[i] * values[i] for i in range(len(moves))) / total
+        return v
+
+    def policy(self, board: chess.Board, depth: int, k: float) -> Tuple[list[chess.Move], list[float], list[float], float]:
+        moves = list(board.legal_moves)
+        # values = [self.value(board.move(m), depth, k) for m in moves]
+        values = [0.0] * len(moves)
+        for i in range(len(moves)):
+            m = moves[i]
+            board.push(m)
+            values[i] = self.value(board, depth, k)
+            board.pop()
+        weighted = [math.exp(k * v) for v in values]
+        total = sum(weighted)
+        return (moves, values, weighted, total)
 
 # Bot names and ideas from tom7's excellent eloWorld video
 

@@ -22,15 +22,84 @@ class ExampleEngine(MinimalEngine):
     """An example engine that all homemade engines inherit."""
 
 
+# Alpha-beta pruning.
+class AlphaBeta(ExampleEngine):
+    """Explores the game tree exhaustively to a certain depth.
+
+    The leaves are rated 1.0 for a win of the current player, 0.0 for a draw, and -1.0 for a loss.
+    An inner node gets the flipped evaluation v_i of each move.
+    The evaluation of the node is the maximum value.
+
+    The frequency of picking move i is h_i = exp(k * v_i), where k is a parameter.
+    """
+
+    visited = 0
+
+    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
+        """Choose a random move according to the distribution generated from iterative evaluation."""
+        k = 5.0
+        depth = 4
+
+        # Get moves and values for the current board.
+        self.visited = 0
+        (moves, values) = self.policy(board, depth, -1.0, 1.0)
+        logger.info(f"Visited {self.visited} nodes.")
+        rated_moves = sorted([(moves[i], values[i]) for i in range(len(moves))], key=lambda x: x[1], reverse=True)
+        logger.info(f"Rated moves: {rated_moves}")
+
+        # Calculate the policy.
+        weighted = [math.exp(k * v) for v in values]
+        # total = sum(weighted)
+        # policy = sorted([(moves[i], weighted[i] / total) for i in range(len(moves))], key=lambda x: x[1], reverse=True)
+        # # policy = {moves[i]: weighted[i] / total for i in range(len(moves))}
+        # logger.info(f"Policy: {policy}")
+
+        # Choose a move.
+        [move] = random.choices(population=moves, weights=weighted, k=1)
+        logger.info(f"Move: {move}")
+
+        return PlayResult(move, None)
+
+    # Alpha (α) and beta (β) represent lower and upper bounds for child node values at a given tree depth.
+    def value(self, board: chess.Board, depth: int, alpha, beta: float) -> float:
+        self.visited += 1
+        outcome = board.outcome()
+        if outcome is not None:
+            if outcome.winner is None:
+                return 0.0
+            if outcome.winner == board.turn:
+                return 1.0
+            return -1.0
+        if depth <= 0:
+            return 0.0
+        (moves, values) = self.policy(board, depth-1, alpha, beta)
+        return max(values)
+
+    def policy(self, board: chess.Board, depth: int, alpha, beta: float) -> Tuple[list[chess.Move], list[float]]:
+        moves = list(board.legal_moves)
+        # values = [self.value(board.move(m), depth) for m in moves]
+        values = [-9.9] * len(moves)
+        for i in range(len(moves)):
+            board.push(moves[i])
+            v = -self.value(board, depth, -beta, -alpha)
+            board.pop()
+            values[i] = v
+            alpha = max(alpha, v)
+            if alpha >= beta:
+                break
+        return (moves, values)
+
+
+
 # Classic min-max.
 class MinMax(ExampleEngine):
     """Explores the game tree exhaustively to a certain depth.
 
     The leaves are rated 1.0 for a win of the current player, 0.0 for a draw, and -1.0 for a loss.
     An inner node gets the flipped evaluation v_i of each move.
-    The frequency of picking move i is h_i = exp(k * v_i), where k is a parameter.
-    The probability of picking move i is h_i / sum(h_i).
     The evaluation of the node is the maximum value.
+
+    The frequency of picking move i is h_i = exp(k * v_i), where k is a parameter.
     """
 
     visited = 0

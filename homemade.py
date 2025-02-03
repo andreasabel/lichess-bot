@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 class ExampleEngine(MinimalEngine):
     """An example engine that all homemade engines inherit."""
 
+class TimeOutException(Exception):
+    """Exception raised for a timeout."""
+    def __init__(self, message : str = "Operation timed out"):
+        self.message = message
+        super().__init__(self.message)
+
 class RatedMoveSequence:
     """A sequence of moves with rating of the sequence."""
 
@@ -33,6 +39,106 @@ class RatedMoveSequence:
 
     def __repr__(self):
         return str(self)
+
+
+# Iterative deepening with alpha-beta pruning.
+class IterativeDeepening(ExampleEngine):
+    """Explores the game tree to increaing depth, pruning irrelevant subtrees,
+    until the time limit is reached.
+
+    The leaves are rated 1.0 for a win of the current player, 0.0 for a draw, and -1.0 for a loss.
+    An inner node gets the flipped evaluation v_i of each move.
+    The evaluation of the node is the maximum value.
+
+    One of the best moves is randomly picked in the end.
+    """
+    # Count the number of visited positions in a search.
+    visited = 0
+    # Interrupt search when we have visited a million nodes.
+    max_nodes = 1000000
+    # Do not attempt the next iteration when we already visited many nodes.
+    hopeless  = 75000
+
+    # The decay factor <= 1 for the evaluation of the child nodes.
+    # For decay = 1 the bot will not try to prolongue the game if it thinks it is losing.
+    decay = 0.95
+
+    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
+        """Choose a random best move."""
+
+        self.visited = 0
+        best_possible_rating = self.decay
+
+        for depth in range(1, 100):
+            if self.visited > self.hopeless:
+                break
+            try:
+                policy = list(self.policy(board.copy(), depth))
+            except TimeOutException:
+                break
+
+            # Find the best rating.
+            best_move_sequence = max(policy, key=lambda x: x.rating)
+            best_rating = best_move_sequence.rating
+            logger.info(f"Depth {depth}, cum. nodes: {self.visited}, rating: {best_rating}, moves: {board.variation_san(best_move_sequence.moves)}")
+
+            if best_rating >= best_possible_rating or best_rating <= -best_possible_rating:
+                break
+            best_possible_rating = best_possible_rating * self.decay
+
+        # Find the best moves.
+        best_move_sequences = [rms.moves for rms in policy if rms.rating >= best_rating] # type: ignore
+        logger.info(f"Best move sequences:")
+        for ms in best_move_sequences:
+            logger.info(f"- {board.variation_san(ms)}")
+
+        # Choose one of the best moves.
+        moves = [ms[0] for ms in best_move_sequences]
+        move = random.choice(moves)
+        logger.info(f"Move: {board.san(move)}")
+
+        return PlayResult(move, None)
+
+    def policy(self, board: chess.Board, depth: int) -> Generator[RatedMoveSequence]:
+        for m in board.legal_moves:
+            board.push(m)
+            rms = self.value(board, depth, -1.0, 1.0)
+            board.pop()
+            yield RatedMoveSequence(-rms.rating, [m] + rms.moves)
+
+    # Alpha (α) and beta (β) represent lower and upper bounds for child node values at a given tree depth.
+    def value(self, board: chess.Board, depth: int, alpha: float, beta: float) -> RatedMoveSequence:
+        self.visited += 1
+        if self.visited > self.max_nodes:
+            raise TimeOutException()
+
+        # If game is finished or depth exhausted, give the immediate evaluation.
+        outcome = board.outcome()
+        if outcome is not None:
+            if outcome.winner is None:
+                return RatedMoveSequence(0.0)
+            if outcome.winner == board.turn:
+                return RatedMoveSequence(1.0)
+            return RatedMoveSequence(-1.0)
+        if depth <= 0:
+            return RatedMoveSequence(0.0)
+
+        # Otherwise, evaluate the child nodes.
+        best_move = None
+        for m in board.legal_moves:
+            board.push(m)
+            rms = self.value(board, depth-1, -beta, -alpha)
+            board.pop()
+            v = -self.decay * rms.rating
+            if v > alpha:
+                best_move = None
+                alpha = v
+            if best_move is None:
+                best_move = RatedMoveSequence(v, [m] + rms.moves)
+            if alpha >= beta:
+                break
+        return best_move # type: ignore
+
 
 # Alpha-beta pruning.
 class AlphaBeta(ExampleEngine):

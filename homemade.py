@@ -47,6 +47,10 @@ class AlphaBeta(ExampleEngine):
 
     visited = 0
 
+    # The decay factor <= 1 for the evaluation of the child nodes.
+    # For decay = 1 the bot will not try to prolongue the game if it thinks it is losing.
+    decay = 0.95
+
     def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
         """Choose a random move according to the distribution generated from iterative evaluation."""
         k = 5.0
@@ -112,7 +116,7 @@ class AlphaBeta(ExampleEngine):
             return RatedMoveSequence(-1.0)
         if depth <= 0:
             return RatedMoveSequence(0.0)
-        values = self.policy1(board, depth, alpha, beta)
+        values = self.policy2(board, depth, alpha, beta)
         return max(values, key=lambda x: x.rating)
 
     def policy1(self, board: chess.Board, depth: int, alpha: float, beta: float) -> list[RatedMoveSequence]:
@@ -130,6 +134,17 @@ class AlphaBeta(ExampleEngine):
                 break
         return values
 
+
+    def policy2(self, board: chess.Board, depth: int, alpha: float, beta: float) -> Generator[RatedMoveSequence]:
+        for m in board.legal_moves:
+            board.push(m)
+            rms = self.value(board, depth-1, -beta, -alpha)
+            board.pop()
+            v = -self.decay * rms.rating
+            yield RatedMoveSequence(v, [m] + rms.moves)
+            alpha = max(alpha, v)
+            if alpha >= beta:
+                break
 
 
 # Classic min-max.

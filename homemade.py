@@ -36,13 +36,13 @@ class RatedMoveSequence:
 
 # Alpha-beta pruning.
 class AlphaBeta(ExampleEngine):
-    """Explores the game tree exhaustively to a certain depth.
+    """Explores the game tree to a certain depth, pruning irrelevant subtrees.
 
     The leaves are rated 1.0 for a win of the current player, 0.0 for a draw, and -1.0 for a loss.
     An inner node gets the flipped evaluation v_i of each move.
     The evaluation of the node is the maximum value.
 
-    The frequency of picking move i is h_i = exp(k * v_i), where k is a parameter.
+    One of the best moves is randomly picked in the end.
     """
 
     visited = 0
@@ -106,6 +106,38 @@ class AlphaBeta(ExampleEngine):
 
     # Alpha (α) and beta (β) represent lower and upper bounds for child node values at a given tree depth.
     def value(self, board: chess.Board, depth: int, alpha: float, beta: float) -> RatedMoveSequence:
+        self.visited += 1
+
+        # If game is finished or depth exhausted, give the immediate evaluation.
+        outcome = board.outcome()
+        if outcome is not None:
+            if outcome.winner is None:
+                return RatedMoveSequence(0.0)
+            if outcome.winner == board.turn:
+                return RatedMoveSequence(1.0)
+            return RatedMoveSequence(-1.0)
+        if depth <= 0:
+            return RatedMoveSequence(0.0)
+
+        # Otherwise, evaluate the child nodes.
+        best_move = None
+        for m in board.legal_moves:
+            board.push(m)
+            rms = self.value(board, depth-1, -beta, -alpha)
+            board.pop()
+            v = -self.decay * rms.rating
+            if v > alpha:
+                best_move = None
+                alpha = v
+            if best_move is None:
+                best_move = RatedMoveSequence(v, [m] + rms.moves)
+            if alpha >= beta:
+                break
+        return best_move # type: ignore
+
+
+    # Alpha (α) and beta (β) represent lower and upper bounds for child node values at a given tree depth.
+    def value2(self, board: chess.Board, depth: int, alpha: float, beta: float) -> RatedMoveSequence:
         self.visited += 1
         outcome = board.outcome()
         if outcome is not None:

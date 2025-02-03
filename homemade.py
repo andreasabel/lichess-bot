@@ -3,7 +3,7 @@ Some example classes for people who want to create a homemade bot.
 
 With these classes, bot makers will not have to implement the UCI or XBoard interfaces themselves.
 """
-from typing import Tuple
+from typing import Generator, Tuple
 import chess
 from chess.engine import PlayResult, Limit
 import math
@@ -21,6 +21,18 @@ logger = logging.getLogger(__name__)
 class ExampleEngine(MinimalEngine):
     """An example engine that all homemade engines inherit."""
 
+class RatedMoveSequence:
+    """A sequence of moves with rating of the sequence."""
+
+    def __init__(self, rating: float, moves: list[chess.Move] = []):
+        self.moves = moves
+        self.rating = rating
+
+    def __str__(self):
+        return f"RatedMoveSequence({self.rating}, {self.moves})"
+
+    def __repr__(self):
+        return str(self)
 
 # Alpha-beta pruning.
 class AlphaBeta(ExampleEngine):
@@ -38,56 +50,66 @@ class AlphaBeta(ExampleEngine):
     def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
         """Choose a random move according to the distribution generated from iterative evaluation."""
         k = 5.0
-        depth = 4
+        depth = 3
 
         # Get moves and values for the current board.
         self.visited = 0
-        (moves, values) = self.policy(board, depth, -1.0, 1.0)
+        policy = list(self.policy(board, depth))
         logger.info(f"Visited {self.visited} nodes.")
-        rated_moves = sorted([(moves[i], values[i]) for i in range(len(moves))], key=lambda x: x[1], reverse=True)
+        rated_moves = sorted(policy, key=lambda x: x.rating, reverse=True)
         logger.info(f"Rated moves: {rated_moves}")
 
         # Calculate the policy.
-        weighted = [math.exp(k * v) for v in values]
+        weighted = [math.exp(k * rms.rating) for rms in policy]
         # total = sum(weighted)
         # policy = sorted([(moves[i], weighted[i] / total) for i in range(len(moves))], key=lambda x: x[1], reverse=True)
         # # policy = {moves[i]: weighted[i] / total for i in range(len(moves))}
         # logger.info(f"Policy: {policy}")
 
         # Choose a move.
+        moves = [rms.moves[0] for rms in policy]
         [move] = random.choices(population=moves, weights=weighted, k=1)
         logger.info(f"Move: {move}")
 
         return PlayResult(move, None)
 
+    def policy(self, board: chess.Board, depth: int) -> Generator[RatedMoveSequence]:
+        for m in board.legal_moves:
+            board.push(m)
+            rms = self.value(board, depth, -1.0, 1.0)
+            board.pop()
+            yield RatedMoveSequence(-rms.rating, [m] + rms.moves)
+
+
     # Alpha (α) and beta (β) represent lower and upper bounds for child node values at a given tree depth.
-    def value(self, board: chess.Board, depth: int, alpha, beta: float) -> float:
+    def value(self, board: chess.Board, depth: int, alpha: float, beta: float) -> RatedMoveSequence:
         self.visited += 1
         outcome = board.outcome()
         if outcome is not None:
             if outcome.winner is None:
-                return 0.0
+                return RatedMoveSequence(0.0)
             if outcome.winner == board.turn:
-                return 1.0
-            return -1.0
+                return RatedMoveSequence(1.0)
+            return RatedMoveSequence(-1.0)
         if depth <= 0:
-            return 0.0
-        (moves, values) = self.policy(board, depth-1, alpha, beta)
-        return max(values)
+            return RatedMoveSequence(0.0)
+        values = self.policy1(board, depth, alpha, beta)
+        return max(values, key=lambda x: x.rating)
 
-    def policy(self, board: chess.Board, depth: int, alpha, beta: float) -> Tuple[list[chess.Move], list[float]]:
+    def policy1(self, board: chess.Board, depth: int, alpha: float, beta: float) -> list[RatedMoveSequence]:
         moves = list(board.legal_moves)
         # values = [self.value(board.move(m), depth) for m in moves]
-        values = [-9.9] * len(moves)
+        values = [RatedMoveSequence(-9.9, [m]) for m in moves]
         for i in range(len(moves)):
             board.push(moves[i])
-            v = -self.value(board, depth, -beta, -alpha)
+            rms = self.value(board, depth-1, -beta, -alpha)
             board.pop()
-            values[i] = v
+            v = -rms.rating
+            values[i] = RatedMoveSequence(v, [moves[i]] + rms.moves)
             alpha = max(alpha, v)
             if alpha >= beta:
                 break
-        return (moves, values)
+        return values
 
 
 
@@ -141,7 +163,7 @@ class MinMax(ExampleEngine):
             return -1.0
         if depth <= 0:
             return 0.0
-        (moves, values) = self.policy(board, depth-1)
+        (_moves, values) = self.policy(board, depth-1)
         return max(values)
 
     def policy(self, board: chess.Board, depth: int) -> Tuple[list[chess.Move], list[float]]:
@@ -176,7 +198,7 @@ class IteratedRandomMove(ExampleEngine):
         depth = 3
 
         self.visited = 0
-        (moves, values, weighted, total) = self.policy(board, depth, k)
+        (moves, _values, weighted, total) = self.policy(board, depth, k)
         logger.info(f"Visited {self.visited} nodes.")
 
         policy = {moves[i]: weighted[i] / total for i in range(len(moves))}

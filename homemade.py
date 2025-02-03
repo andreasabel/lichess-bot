@@ -50,12 +50,31 @@ class AlphaBeta(ExampleEngine):
     def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
         """Choose a random move according to the distribution generated from iterative evaluation."""
         k = 5.0
-        depth = 3
+        depth = 4
 
         # Get moves and values for the current board.
         self.visited = 0
         policy = list(self.policy(board, depth))
         logger.info(f"Visited {self.visited} nodes.")
+
+        # Find the best rating.
+        best_rating = max(policy, key=lambda x: x.rating).rating
+        logger.info(f"Best rating: {best_rating}")
+
+        # Find the best moves.
+        best_move_sequences = [rms.moves for rms in policy if rms.rating >= best_rating]
+        logger.info(f"Best move sequences:")
+        for ms in best_move_sequences:
+            logger.info(f"- {board.variation_san(ms)}")
+
+        # Choose one of the best moves.
+        moves = [ms[0] for ms in best_move_sequences]
+        move = random.choice(moves)
+        logger.info(f"Move: {board.lan(move)}")
+
+        return PlayResult(move, None)
+
+
         rated_moves = sorted(policy, key=lambda x: x.rating, reverse=True)
         logger.info(f"Rated moves: {rated_moves}")
 

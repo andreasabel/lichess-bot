@@ -130,23 +130,26 @@ class Node:
     def __init__(self, board: chess.Board, depth: int):
         # Depth of the node in the game tree.
         self.depth = depth
+        # Is this a terminal node?
         self.finished = None
 
         # Check if the game is finished and set the value accordingly.
         # If winner is True (WHITE), the value is 1.0.
         outcome = board.outcome()
-        if outcome is not None:
+        if outcome is None:
+            # Number of visits to the node.
+            self.visits = 0
+            # Number of wins of WHITE from the node.
+            self.white_wins = 0.0
+        else:
             if outcome.winner is None:
                 self.finished = 0.0
             elif outcome.winner == chess.WHITE:
                 self.finished = 1.0
             else:
                 self.finished = -1.0
-
-        # Number of visits to the node.
-        self.visits = 0
-        # Number of wins of WHITE from the node.
-        self.white_wins = 0.0
+            self.visits = 1
+            self.white_wins = self.finished
 
         # Unexplored moves in a random order.
         moves = list(board.legal_moves)
@@ -174,10 +177,17 @@ class Node:
             # Try an unexplored move.
             move = next(self.unexplored_moves, None)
             if move is not None:
+                # The reward in case this move wins for us.
+                value = 1.0 if board.turn else -1.0
                 # Expand the new child.
                 board.push(move)
                 child = Node(board, self.depth+1)
-                value = child.rollout(board)
+                # If the move wins for us, we consider the present node finished.
+                # We do not need to explore it further.
+                if child.finished == value:
+                    self.finished = value
+                else:
+                    value = child.rollout(board)
                 board.pop()
                 self.children[child] = move
 

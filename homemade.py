@@ -148,15 +148,13 @@ class Node:
         # Number of wins of WHITE from the node.
         self.white_wins = 0.0
 
-        # Only for non-terminal nodes:
-        if True: ## self.finished is not None:
-            # Unexplored moves in a random order.
-            moves = list(board.legal_moves)
-            random.shuffle(moves)
-            self.unexplored_moves = iter(moves)
+        # Unexplored moves in a random order.
+        moves = list(board.legal_moves)
+        random.shuffle(moves)
+        self.unexplored_moves = iter(moves)
 
-            # Children of the node.
-            self.children: dict[Node,chess.Move] = {}
+        # Children of the node.
+        self.children: dict[Node,chess.Move] = {}
 
     # Run a game simulation from the current node and record its result
     def rollout(self, board: chess.Board) -> float:

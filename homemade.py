@@ -205,12 +205,35 @@ class Node:
 
     # Pick the most visited child.
     def best_move(self, board: chess.Board) -> chess.Move:
-        logger.info(f"Node: {self.depth}, visits: {self.visits}, white_wins: {self.white_wins}")
-        for node, move in self.children.items():
-            logger.info(f"  {board.san(move)}: {node.visits}, {node.white_wins}")
         # Pick the child with the highest number of visits.
         (child, _quality) = max([(node, node.visits) for node in self.children.keys()], key=lambda x: x[1])
         return self.children[child]
+
+    def best_move_sequence(self, board: chess.Board) -> list[chess.Move]:
+        if not self.children:
+            return []
+        # Pick the child with the highest number of visits.
+        (child, _quality) = max([(node, node.visits) for node in self.children.keys()], key=lambda x: x[1])
+        board.push(self.children[child])
+        seq = child.best_move_sequence(board)
+        board.pop()
+        return [self.children[child]] + seq
+
+    def variants(self, board: chess.Board) -> Generator[Tuple['Node', list[chess.Move]]]:
+        for node, move in self.children.items():
+            board.push(move)
+            seq = [move] + node.best_move_sequence(board)
+            board.pop()
+            yield (node, seq)
+
+    def log_policy(self, board: chess.Board):
+        logger.info(f"Depth: {self.depth}, Rating: {self.white_wins / self.visits}")
+        variants = list(self.variants(board))
+        variants.sort(key=lambda p: p[0].visits, reverse=True)
+
+        for node, seq in variants:
+            logger.info(f"  {node.visits:3d}, {node.white_wins / node.visits:+1.2f}, {board.variation_san(seq)}")
+
 
 
 class MCTSPlayer(Player):
@@ -224,6 +247,7 @@ class MCTSPlayer(Player):
         root = Node(board, 0)
         for _ in range(self.max_nodes):
             root.explore(board)
+        root.log_policy(board)
         return root.best_move(board)
 
 

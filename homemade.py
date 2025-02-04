@@ -40,6 +40,76 @@ class RatedMoveSequence:
     def __repr__(self):
         return str(self)
 
+# Base player: returns the first legal move.
+class Player:
+    """A player picking a move given a board."""
+
+    # The number of nodes visited in the search.
+    visited = 0
+
+    def move(self, board: chess.Board) -> chess.Move:
+        return next(board.generate_legal_moves())
+
+# Random move engine.
+#####################
+
+class RandomPlayer(Player):
+    """A player picking a random move."""
+
+    def move(self, board: chess.Board) -> chess.Move:
+        return random.choice(list(board.legal_moves))
+
+class RandomMove(ExampleEngine):
+    """Get a random move."""
+
+    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
+        """Choose a random move."""
+        return PlayResult(RandomPlayer().move(board), None)
+
+# Greedy move engine.
+#####################
+
+class GreedyPlayer(Player):
+    """A player picking a move that directly wins, or a move that does not directly lose."""
+
+    def move(self, board: chess.Board) -> chess.Move:
+        """Choose a move that directly wins, or a move that does not directly lose.
+        Restores the board state."""
+        non_losing_moves: list[chess.Move] = []
+        moves = list(board.legal_moves)
+        for m in moves:
+            self.visited += 1
+            board.push(m)
+            outcome = board.outcome()
+            board.pop()
+            # Search for a non-losing move.
+            if outcome is None or outcome.winner is None:
+                non_losing_moves.append(m)
+            # If we find a winning move, commit to it and stop the search.
+            elif outcome.winner == board.turn:
+                return m
+        # If we did not find a winning move, randomly choose a non-losing move.
+        if non_losing_moves:
+            return random.choice(non_losing_moves)
+        # If there are no only losing moves, return one of then randomly.
+        return random.choice(moves)
+
+class GreedyMove(ExampleEngine):
+    """Get a move that directly wins, or a move that does not directly lose."""
+
+    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
+        """Choose a move that directly wins, or a move that does not directly lose."""
+        return PlayResult(GreedyPlayer().move(board), None)
+
+
+# Monte Carlo Tree Search.
+class MonteCarloTreeSearch(ExampleEngine):
+    """Explores the game tree with Monte Carlo Tree Search.
+
+    We do not need to store the board at each node, because we can always reconstruct it from the root.
+
+    """
+
 
 # Iterative deepening with alpha-beta pruning.
 class IterativeDeepening(ExampleEngine):
@@ -412,32 +482,6 @@ class IteratedRandomMove(ExampleEngine):
 
 # Bot names and ideas from tom7's excellent eloWorld video
 
-class RandomMove(ExampleEngine):
-    """Get a random move."""
-
-    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
-        """Choose a random move."""
-        return PlayResult(random.choice(list(board.legal_moves)), None)
-
-
-class Alphabetical(ExampleEngine):
-    """Get the first move when sorted by san representation."""
-
-    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
-        """Choose the first move alphabetically."""
-        moves = list(board.legal_moves)
-        moves.sort(key=board.san)
-        return PlayResult(moves[0], None)
-
-
-class FirstMove(ExampleEngine):
-    """Get the first move when sorted by uci representation."""
-
-    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
-        """Choose the first move alphabetically in uci representation."""
-        moves = list(board.legal_moves)
-        moves.sort(key=str)
-        return PlayResult(moves[0], None)
 
 
 class ComboEngine(ExampleEngine):

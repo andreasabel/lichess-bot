@@ -50,6 +50,22 @@ class Player:
     def move(self, board: chess.Board) -> chess.Move:
         return next(board.generate_legal_moves())
 
+    def rollout(self, board: chess.Board, max_depth: int) -> float:
+        """Simulate a game from the current position, destroying the board.
+        The returned value is from the perspective of WHITE.
+        So it is 1.0 if WHITE wins, 0.0 if it is a draw, and -1.0 if BLACK wins."""
+        outcome = board.outcome()
+        depth = 0
+        while outcome is None and depth < max_depth:
+            board.push(self.move(board))
+            outcome = board.outcome()
+            depth += 1
+        if outcome is None or outcome.winner is None:
+            return 0.0
+        if outcome.winner: # WHITE wins
+            return 1.0
+        return -1.0
+
 # Random move engine.
 #####################
 
@@ -102,6 +118,115 @@ class GreedyMove(ExampleEngine):
         return PlayResult(GreedyPlayer().move(board), None)
 
 
+class Node:
+    """A node in a game tree."""
+
+    # Maximum depth of a rollout.
+    rollout_depth = 100
+
+    # Parameter balancing exploration vs. exploitation.
+    # c = math.sqrt(1.5)
+
+    def __init__(self, board: chess.Board, depth: int):
+        # Depth of the node in the game tree.
+        self.depth = depth
+        self.finished = None
+
+        # Check if the game is finished and set the value accordingly.
+        # If winner is True (WHITE), the value is 1.0.
+        outcome = board.outcome()
+        if outcome is not None:
+            if outcome.winner is None:
+                self.finished = 0.0
+            elif outcome.winner == chess.WHITE:
+                self.finished = 1.0
+            else:
+                self.finished = -1.0
+
+        # Number of visits to the node.
+        self.visits = 0
+        # Number of wins of WHITE from the node.
+        self.white_wins = 0.0
+
+        # Only for non-terminal nodes:
+        if True: ## self.finished is not None:
+            # Unexplored moves in a random order.
+            moves = list(board.legal_moves)
+            random.shuffle(moves)
+            self.unexplored_moves = iter(moves)
+
+            # Children of the node.
+            self.children: dict[Node,chess.Move] = {}
+
+    # Run a game simulation from the current node and record its result
+    def rollout(self, board: chess.Board) -> float:
+        if self.finished is not None:
+            value = self.finished
+        else:
+            value = GreedyPlayer().rollout(board.copy(), self.rollout_depth)
+        self.white_wins += value
+        self.visits += 1
+        return value
+
+    #
+    def explore(self, board: chess.Board) -> float:
+        if self.finished is not None:
+            value = self.finished
+        else:
+            # Try an unexplored move.
+            move = next(self.unexplored_moves, None)
+            if move is not None:
+                # Expand the new child.
+                board.push(move)
+                child = Node(board, self.depth+1)
+                value = child.rollout(board)
+                board.pop()
+                self.children[child] = move
+
+            else:
+                # Pick an existing child to explore using UCB.
+                # If I am WHITE, I consider the wins of WHITE as positive.
+                sign = 1.0 if board.turn else -1.0
+                logN = math.log(self.visits)
+                qs = [ (node, sign * node.white_wins / node.visits + 2.0 * math.sqrt(logN / node.visits))
+                        for node in self.children.keys() ]
+                (child, _quality) = max(qs, key=lambda x: x[1])
+
+                # Recurse into the child.
+                move = self.children[child]
+                board.push(move)
+                value = child.explore(board)
+                board.pop()
+
+        # Backpropagate
+        self.white_wins += value
+        self.visits += 1
+        return value
+
+    # Pick the most visited child.
+    def best_move(self, board: chess.Board) -> chess.Move:
+        logger.info(f"Node: {self.depth}, visits: {self.visits}, white_wins: {self.white_wins}")
+        for node, move in self.children.items():
+            logger.info(f"  {board.san(move)}: {node.visits}, {node.white_wins}")
+        # Pick the child with the highest number of visits.
+        (child, _quality) = max([(node, node.visits) for node in self.children.keys()], key=lambda x: x[1])
+        return self.children[child]
+
+
+class MCTSPlayer(Player):
+    """A player using Monte Carlo Tree Search."""
+
+    def __init__(self, max_nodes: int = 1000):
+        # Number of explorations.
+        self.max_nodes = max_nodes
+
+    def move(self, board: chess.Board) -> chess.Move:
+        root = Node(board, 0)
+        for _ in range(self.max_nodes):
+            root.explore(board)
+        return root.best_move(board)
+
+
 # Monte Carlo Tree Search.
 class MonteCarloTreeSearch(ExampleEngine):
     """Explores the game tree with Monte Carlo Tree Search.
@@ -109,6 +234,9 @@ class MonteCarloTreeSearch(ExampleEngine):
     We do not need to store the board at each node, because we can always reconstruct it from the root.
 
     """
+    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
+        """Choose a move using Monte Carlo Tree Search."""
+        return PlayResult(MCTSPlayer().move(board), None)
 
 
 # Iterative deepening with alpha-beta pruning.

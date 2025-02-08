@@ -12,6 +12,9 @@ from lib.engine_wrapper import MinimalEngine
 from lib.lichess_types import MOVE, HOMEMADE_ARGS_TYPE
 import logging
 
+# Own modules
+from engines.player import Player, RandomPlayer, GreedyPlayer
+
 
 # Use this logger variable to print messages to the console or log files.
 # logger.info("message") will always print "message" to the console or log file.
@@ -40,40 +43,9 @@ class RatedMoveSequence:
     def __repr__(self):
         return str(self)
 
-# Base player: returns the first legal move.
-class Player:
-    """A player picking a move given a board."""
-
-    # The number of nodes visited in the search.
-    visited = 0
-
-    def move(self, board: chess.Board) -> chess.Move:
-        return next(board.generate_legal_moves())
-
-    def rollout(self, board: chess.Board, max_depth: int) -> float:
-        """Simulate a game from the current position, destroying the board.
-        The returned value is from the perspective of WHITE.
-        So it is 1.0 if WHITE wins, 0.0 if it is a draw, and -1.0 if BLACK wins."""
-        outcome = board.outcome()
-        depth = 0
-        while outcome is None and depth < max_depth:
-            board.push(self.move(board))
-            outcome = board.outcome()
-            depth += 1
-        if outcome is None or outcome.winner is None:
-            return 0.0
-        if outcome.winner: # WHITE wins
-            return 1.0
-        return -1.0
 
 # Random move engine.
 #####################
-
-class RandomPlayer(Player):
-    """A player picking a random move."""
-
-    def move(self, board: chess.Board) -> chess.Move:
-        return random.choice(list(board.legal_moves))
 
 class RandomMove(ExampleEngine):
     """Get a random move."""
@@ -85,30 +57,6 @@ class RandomMove(ExampleEngine):
 # Greedy move engine.
 #####################
 
-class GreedyPlayer(Player):
-    """A player picking a move that directly wins, or a move that does not directly lose."""
-
-    def move(self, board: chess.Board) -> chess.Move:
-        """Choose a move that directly wins, or a move that does not directly lose.
-        Restores the board state."""
-        non_losing_moves: list[chess.Move] = []
-        moves = list(board.legal_moves)
-        for m in moves:
-            self.visited += 1
-            board.push(m)
-            outcome = board.outcome()
-            board.pop()
-            # Search for a non-losing move.
-            if outcome is None or outcome.winner is None:
-                non_losing_moves.append(m)
-            # If we find a winning move, commit to it and stop the search.
-            elif outcome.winner == board.turn:
-                return m
-        # If we did not find a winning move, randomly choose a non-losing move.
-        if non_losing_moves:
-            return random.choice(non_losing_moves)
-        # If there are no only losing moves, return one of then randomly.
-        return random.choice(moves)
 
 class GreedyMove(ExampleEngine):
     """Get a move that directly wins, or a move that does not directly lose."""

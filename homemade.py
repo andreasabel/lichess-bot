@@ -65,6 +65,8 @@ class GreedyMove(ExampleEngine):
         """Choose a move that directly wins, or a move that does not directly lose."""
         return PlayResult(GreedyPlayer().move(board), None)
 
+# Monte Carlo Tree Search.
+##########################
 
 class Node:
     """A node in a game tree."""
@@ -329,58 +331,86 @@ class AlphaBeta(ExampleEngine):
     One of the best moves is randomly picked in the end.
     """
 
-    visited = 0
-
-    # The decay factor <= 1 for the evaluation of the child nodes.
-    # For decay = 1 the bot will not try to prolong the game if it thinks it is losing.
-    decay = 0.95
-
     def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
-        """Choose a random move according to the distribution generated from iterative evaluation."""
-        k = 5.0
+        """Choose a move determined by complete exploration up to a depth optimized by alpha-beta pruning."""
+
+        # The decay factor <= 1 for the evaluation of the child nodes.
+        # For decay = 1 the bot will not try to prolong the game if it thinks it is losing.
+        decay = 0.95
+
         depth = 4
+        player = AlphaBetaPlayer(depth, decay)
+        move = player.move(board)
+        # Print the search results and statistics.
+        player.log(board)
+        return PlayResult(move, None)
+
+
+class AlphaBetaPlayer(Player):
+    """A player using Alpha-Beta pruning."""
+
+    def __init__(self, depth: int = 3, decay: float = 1.0):
+        self.depth = depth
+        self.decay = decay
+
+        # Count the number of visited positions in a search.
+        self.visited = 0
+
+        # Data computed by the move() method:
+        #####################################
+
+        # Policy is a list of RatedMoveSequence.
+        self.move_sequences: list[RatedMoveSequence] = []
+
+        # Best rating found.
+        self.best_rating = 0.0
+        self.best_move_sequences: list[list[chess.Move]] = []
+
+        # Randomly chosen move from the best moves.
+        self.chosen_move: chess.Move | None = None
+
+    def move(self, board: chess.Board) -> chess.Move:
+        """Choose a move determined by complete exploration up to self.depth optimized by alpha-beta pruning.
+        This method sets the following attributes:
+        - self.visited
+        - self.move_sequences
+        - self.best_rating
+        - self.best_move_sequences
+        - self.chosen_move
+        """
+
+        # Count the number of visited positions in a search.
+        self.visited = 0
 
         # Get moves and values for the current board.
-        self.visited = 0
-        policy = list(self.policy(board, depth))
-        logger.info(f"Visited {self.visited} nodes.")
+        self.move_sequences = list(self.policy(board, self.depth))
 
         # Find the best rating.
-        best_rating = max(policy, key=lambda x: x.rating).rating
-        logger.info(f"Best rating: {best_rating}")
+        self.best_rating = max(self.move_sequences, key=lambda x: x.rating).rating
 
         # Find the best moves.
-        best_move_sequences = [rms.moves for rms in policy if rms.rating >= best_rating]
-        logger.info(f"Best move sequences:")
-        for ms in best_move_sequences:
-            logger.info(f"- {board.variation_san(ms)}")
+        self.best_move_sequences = [rms.moves for rms in self.move_sequences if rms.rating >= self.best_rating]
 
         # Choose one of the best moves.
-        moves = [ms[0] for ms in best_move_sequences]
-        move = random.choice(moves)
-        logger.info(f"Move: {board.lan(move)}")
+        moves = [ms[0] for ms in self.best_move_sequences]
+        self.chosen_move = random.choice(moves)
+        return self.chosen_move
 
-        return PlayResult(move, None)
+    def log(self, board: chess.Board):
+        """Print the search results and statistics of the last move() invocation."""
 
+        logger.info(f"Visited {self.visited} nodes.")
 
-        rated_moves = sorted(policy, key=lambda x: x.rating, reverse=True)
-        logger.info(f"Rated moves: {rated_moves}")
+        logger.info(f"Best rating: {self.best_rating}")
+        logger.info(f"Best move sequences:")
+        for ms in self.best_move_sequences:
+            logger.info(f"- {board.variation_san(ms)}")
 
-        # Calculate the policy.
-        weighted = [math.exp(k * rms.rating) for rms in policy]
-        # total = sum(weighted)
-        # policy = sorted([(moves[i], weighted[i] / total) for i in range(len(moves))], key=lambda x: x[1], reverse=True)
-        # # policy = {moves[i]: weighted[i] / total for i in range(len(moves))}
-        # logger.info(f"Policy: {policy}")
-
-        # Choose a move.
-        moves = [rms.moves[0] for rms in policy]
-        [move] = random.choices(population=moves, weights=weighted, k=1)
-        logger.info(f"Move: {move}")
-
-        return PlayResult(move, None)
+        assert self.chosen_move is not None
+        logger.info(f"Move: {board.lan(self.chosen_move)}")
 
     def policy(self, board: chess.Board, depth: int) -> Generator[RatedMoveSequence]:
+        """Compute the value of each legal move of the current board by exploring the game tree up to the given cdepth."""
         for m in board.legal_moves:
             board.push(m)
             rms = self.value(board, depth, -1.0, 1.0)
@@ -390,6 +420,7 @@ class AlphaBeta(ExampleEngine):
 
     # Alpha (α) and beta (β) represent lower and upper bounds for child node values at a given tree depth.
     def value(self, board: chess.Board, depth: int, alpha: float, beta: float) -> RatedMoveSequence:
+        """Compute the value of the current board by exploring the game tree up to the given certain depth."""
         self.visited += 1
 
         # If game is finished or depth exhausted, give the immediate evaluation.

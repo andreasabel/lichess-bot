@@ -273,7 +273,7 @@ class MonteCarloTreeSearch(ExampleEngine):
 
 # Iterative deepening with alpha-beta pruning.
 class IterativeDeepening(ExampleEngine):
-    """Explores the game tree to increaing depth, pruning irrelevant subtrees,
+    """Explores the game tree to increasing depth, pruning irrelevant subtrees,
     until the time limit is reached.
 
     The leaves are rated 1.0 for a win of the current player, 0.0 for a draw, and -1.0 for a loss.
@@ -290,7 +290,7 @@ class IterativeDeepening(ExampleEngine):
     hopeless  = 75000
 
     # The decay factor <= 1 for the evaluation of the child nodes.
-    # For decay = 1 the bot will not try to prolongue the game if it thinks it is losing.
+    # For decay = 1 the bot will not try to prolong the game if it thinks it is losing.
     decay = 0.95
 
     def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
@@ -384,7 +384,7 @@ class AlphaBeta(ExampleEngine):
     visited = 0
 
     # The decay factor <= 1 for the evaluation of the child nodes.
-    # For decay = 1 the bot will not try to prolongue the game if it thinks it is losing.
+    # For decay = 1 the bot will not try to prolong the game if it thinks it is losing.
     decay = 0.95
 
     def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002

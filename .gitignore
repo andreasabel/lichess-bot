@@ -2,7 +2,7 @@
 /engines/*
 !/engines/README.md
 lichess_bot_auto_logs/*
-.vscode/*
+# .vscode/*
 .vs/*
 *.pgn
 *.log

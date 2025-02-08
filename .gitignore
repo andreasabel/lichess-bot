@@ -1,10 +1,10 @@
 **/__pycache__
-/engines/*
-!/engines/README.md
+.mypy_cache/
 lichess_bot_auto_logs/*
 # .vscode/*
 .vs/*
 *.pgn
 *.log
 *.txt
+*~
 TEMP/*

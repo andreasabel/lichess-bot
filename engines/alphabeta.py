@@ -4,7 +4,7 @@ from typing import Generator
 import chess
 from logging import Logger
 
-from engines.player import Player, RatedMoveSequence
+from engines.player import Player, RatedMoveSequence, TimeOutException
 
 
 class AlphaBetaPlayer(Player):
@@ -30,6 +30,17 @@ class AlphaBetaPlayer(Player):
         # Randomly chosen move from the best moves.
         self.chosen_move: chess.Move | None = None
 
+    def reset_visited(self):
+        """Reset the number of visited nodes."""
+        self.visited = 0
+
+    def inc_visited(self):
+        """Increment the number of visited nodes.
+        This method can be overridden to act if
+        the number of visits exceeds a certain threshold."""
+        self.visited += 1
+
+
     def move(self, board: chess.Board) -> chess.Move:
         """Choose a move determined by complete exploration up to self.depth optimized by alpha-beta pruning.
         This method sets the following attributes:
@@ -40,8 +51,8 @@ class AlphaBetaPlayer(Player):
         - self.chosen_move
         """
 
-        # Count the number of visited positions in a search.
-        self.visited = 0
+        # Reset the number of visited nodes.
+        self.reset_visited()
 
         # Get moves and values for the current board.
         self.move_sequences = list(self.policy(board, self.depth))
@@ -82,7 +93,7 @@ class AlphaBetaPlayer(Player):
     # Alpha (α) and beta (β) represent lower and upper bounds for child node values at a given tree depth.
     def value(self, board: chess.Board, depth: int, alpha: float, beta: float) -> RatedMoveSequence:
         """Compute the value of the current board by exploring the game tree up to the given certain depth."""
-        self.visited += 1
+        self.inc_visited()
 
         # If game is finished or depth exhausted, give the immediate evaluation.
         outcome = board.outcome()
@@ -111,3 +122,50 @@ class AlphaBetaPlayer(Player):
                 break
         return best_move # type: ignore
 
+class IteratedDeepeningAlphaBetaPlayer(AlphaBetaPlayer):
+    """A player using Iterated Deepening Alpha-Beta pruning."""
+
+    def __init__(self, max_visits: int = 1000000, round_start_limit: int = 80000, decay: float = 1.0):
+
+        # Initialize AlphaBetaPlayer with depth=0, to be incremented in each round.
+        super().__init__(depth=0, decay=decay)
+
+        # The total number of positions we are allowed to visit.
+        self.max_visits = max_visits
+
+        # The max numer of visits we can have spent before starting a new round.
+        self.round_start_limit = round_start_limit
+
+    def reset_visited(self):
+        """Skip the reset."""
+        pass
+
+    def inc_visited(self):  # type: ignore
+        """Increment the number of visited nodes.
+        If the number of visits exceeds max_visits, throw a TimeOutException."""
+        self.visited += 1
+        if self.visited > self.max_visits:
+            raise TimeOutException()
+
+    def move(self, board: chess.Board) -> chess.Move:
+        """Choose a move determined by iterative deepening optimized by alpha-beta pruning."""
+
+        self.visited = 0
+        best_possible_rating = self.decay
+
+        for self.depth in range(1, 100):
+            if self.visited > self.round_start_limit:
+                break
+            try:
+                # Initialize best_rating, best_move_sequences, and chosen_move.
+                super().move(board.copy())
+            except TimeOutException:
+                self.depth -= 1
+                break
+
+            if self.best_rating >= best_possible_rating or self.best_rating <= -best_possible_rating:
+                break
+            best_possible_rating = best_possible_rating * self.decay
+
+        assert self.chosen_move is not None
+        return self.chosen_move

@@ -14,6 +14,14 @@ This module also defines some simple players:
 import random
 import chess
 
+# Exception a player can raise to abort the search when time is out.
+
+class TimeOutException(Exception):
+    """Exception raised for a timeout."""
+    def __init__(self, message : str = "Operation timed out"):
+        self.message = message
+        super().__init__(self.message)
+
 # List of moves with a rating to be used in players.
 
 class RatedMoveSequence:

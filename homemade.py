@@ -14,8 +14,8 @@ import logging
 
 # Own modules
 from engines.player import Player, RandomPlayer, GreedyPlayer
-from engines.player import RatedMoveSequence
-from engines.alphabeta import AlphaBetaPlayer
+from engines.player import RatedMoveSequence, TimeOutException
+from engines.alphabeta import AlphaBetaPlayer, IteratedDeepeningAlphaBetaPlayer
 
 
 # Use this logger variable to print messages to the console or log files.
@@ -25,12 +25,6 @@ logger = logging.getLogger(__name__)
 
 class ExampleEngine(MinimalEngine):
     """An example engine that all homemade engines inherit."""
-
-class TimeOutException(Exception):
-    """Exception raised for a timeout."""
-    def __init__(self, message : str = "Operation timed out"):
-        self.message = message
-        super().__init__(self.message)
 
 
 
@@ -208,8 +202,31 @@ class MonteCarloTreeSearch(ExampleEngine):
     """
     def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
         """Choose a move using Monte Carlo Tree Search."""
+
+
         return PlayResult(MCTSPlayer().move(board), None)
 
+
+# Iterative deepening with alpha-beta pruning.
+class IterativeDeepeningAlphaBeta(ExampleEngine):
+    def search(self, board: chess.Board, *args: HOMEMADE_ARGS_TYPE) -> PlayResult:  # noqa: ARG002
+        """Choose a move determined by complete exploration up to a depth optimized by alpha-beta pruning."""
+
+        # The decay factor <= 1 for the evaluation of the child nodes.
+        # For decay = 1 the bot will not try to prolong the game if it thinks it is losing.
+        decay = 0.95
+
+        # Interrupt search when we have visited a million nodes.
+        max_nodes = 1000000
+        # Do not attempt the next iteration when we already visited many nodes.
+        hopeless  = 75000
+
+        player = IteratedDeepeningAlphaBetaPlayer(max_nodes, hopeless, decay)
+        move = player.move(board)
+        # Print the search results and statistics.
+        logger.info(f"Exploration depth: {player.depth}")
+        player.log(logger, board)
+        return PlayResult(move, None)
 
 # Iterative deepening with alpha-beta pruning.
 class IterativeDeepening(ExampleEngine):

@@ -14,6 +14,21 @@ This module also defines some simple players:
 import random
 import chess
 
+# List of moves with a rating to be used in players.
+
+class RatedMoveSequence:
+    """A sequence of moves with rating of the sequence."""
+
+    def __init__(self, rating: float, moves: list[chess.Move] = []):
+        self.moves = moves
+        self.rating = rating
+
+    def __str__(self):
+        return f"RatedMoveSequence({self.rating}, {self.moves})"
+
+    def __repr__(self):
+        return str(self)
+
 # Base player: returns the first legal move.
 
 class Player:

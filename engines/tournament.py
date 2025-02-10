@@ -65,21 +65,24 @@ def tournament(player: Player, opponent: Player, games: int = 100) -> tuple[int,
             wins[p] += 1
         else:
             wins[o] += 1
+        logging.info(f"Score: {wins[0]}-{wins[1]}-{draws}")
+
     return wins[0], wins[1], draws
 
 def play(player1: Player, player2: Player) -> chess.Outcome:
     """Play a game between two players."""
-    logging.info("Playing {} vs. {}".format(player1, player2))
+    players = {0: player1, 1: player2}
+    logging.info("Playing {} vs. {}".format(players[0], players[1]))
     start = AtomicBoard()
     board = start.copy()
     outcome: chess.Outcome | None  = None
+    p = 0
     while outcome is None:
-        board.push(player1.move(board))
+        m: chess.Move = players[p].move(board)
+        logging.info(f"Move: {board.variation_san([m])}")
+        board.push(m)
         outcome = board.outcome()
-        if outcome is not None:
-            break
-        board.push(player2.move(board))
-        outcome = board.outcome()
+        p = 1 - p
     game = start.variation_san(board.move_stack)
     logging.info(f"Game: {game}")
     logging.info(f"Outcome: {outcome}")

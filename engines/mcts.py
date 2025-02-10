@@ -116,17 +116,26 @@ class Node:
         self.visits += 1
         return value
 
+    def best_child(self, board: chess.Board) -> 'Node':
+        # Pick the child with the highest number of visits.
+        def measure(node: Node) -> Tuple[float, int]:
+            # If the child is losing, we are winning, so pick it.
+            value = node.finished or 0.0
+            return (value if board.turn else -value, node.visits)
+        # child = max([node for node in self.children.keys()], key=lambda node: node.visits)
+        child = max(self.children.keys(), key=measure)
+        return child
+
     # Pick the most visited child.
     def best_move(self, board: chess.Board) -> chess.Move:
-        # Pick the child with the highest number of visits.
-        (child, _quality) = max([(node, node.visits) for node in self.children.keys()], key=lambda x: x[1])
-        return self.children[child]
+        return self.children[self.best_child(board)]
 
+    # Iterate best_move() until we reach a leaf node.
     def best_move_sequence(self, board: chess.Board) -> list[chess.Move]:
         if not self.children:
             return []
-        # Pick the child with the highest number of visits.
-        (child, _quality) = max([(node, node.visits) for node in self.children.keys()], key=lambda x: x[1])
+        # Iterate best_child() until we reach a leaf node.
+        child = self.best_child(board)
         board.push(self.children[child])
         seq = child.best_move_sequence(board)
         board.pop()

@@ -7,6 +7,7 @@ from rich.logging import RichHandler
 
 from engines.player import *
 from engines.alphabeta import *
+from engines.mcts import MCTSPlayer
 
 # Use this logger variable to print messages to the console or log files.
 # logger.info("message") will always print "message" to the console or log file.
@@ -33,12 +34,17 @@ def main():
     # (wins, losses, draws) = tournament(AlphaBetaPlayer(), GreedyPlayer(), games=100)
     # print(f"AlphaBetaPlayer vs. GreedyPlayer: {wins} wins, {losses} losses, {draws} draws")
 
-    (wins, losses, draws) = tournament(
-        IteratedDeepeningAlphaBetaPlayer(decay=0.95),
-        GreedyPlayer(),
-        games=10)
-    print(f"IteratedDeepeningAlphaBetaPlayer vs. GreedyPlayer: {wins} wins, {losses} losses, {draws} draws")
+    # (wins, losses, draws) = tournament(
+    #     IteratedDeepeningAlphaBetaPlayer(decay=0.95),
+    #     GreedyPlayer(),
+    #     games=10)
+    # print(f"IteratedDeepeningAlphaBetaPlayer vs. GreedyPlayer: {wins} wins, {losses} losses, {draws} draws")
 
+    (wins, losses, draws) = tournament(
+        MCTSPlayer(logger=None, max_nodes=1000),
+        IteratedDeepeningAlphaBetaPlayer(decay=0.95),
+        games=10)
+    print(f"MCTSPlayer vs. IteratedDeepeningAlphaBetaPlayer: {wins} wins, {losses} losses, {draws} draws")
 
 def tournament(player: Player, opponent: Player, games: int = 100) -> tuple[int, int, int]:
     """Play a tournament between two players,

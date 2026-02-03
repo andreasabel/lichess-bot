@@ -141,16 +141,16 @@ challenge:                         # Incoming challenges.
                                    # Unlimited games can be accepted by removing this field or specifying .inf
   min_days: 1                      # Minimum number of days per move to accept a challenge for a correspondence game.
   variants:                        # Chess variants to accept (https://lichess.org/variant).
-#   - standard
-#   - fromPosition
-#   - antichess
+    - standard
+    - fromPosition
+    - antichess
     - atomic
-#   - chess960
-#   - crazyhouse
-#   - horde
-#   - kingOfTheHill
-#   - racingKings
-#   - threeCheck
+    - chess960
+    - crazyhouse
+    - horde
+    - kingOfTheHill
+    - racingKings
+    - threeCheck
   time_controls:                   # Time controls to accept (bots are not allowed to play ultraBullet).
 #    - bullet
     - blitz

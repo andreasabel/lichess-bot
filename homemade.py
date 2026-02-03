@@ -15,7 +15,7 @@ import logging
 # Own modules
 from engines.player import Player, RandomPlayer, GreedyPlayer
 from engines.player import RatedMoveSequence, TimeOutException
-from engines.alphabeta import AlphaBetaPlayer, IteratedDeepeningAlphaBetaPlayer
+from engines.alphabeta import AlphaBetaPlayer, IterativeDeepeningAlphaBetaPlayer
 from engines.mcts import MCTSPlayer
 
 # Use this logger variable to print messages to the console or log files.
@@ -78,7 +78,7 @@ class IterativeDeepeningAlphaBeta(ExampleEngine):
         # Do not attempt the next iteration when we already visited many nodes.
         hopeless  = 75000
 
-        player = IteratedDeepeningAlphaBetaPlayer(max_nodes, hopeless, decay)
+        player = IterativeDeepeningAlphaBetaPlayer(max_nodes, hopeless, decay)
         move = player.move(board)
         # Print the search results and statistics.
         logger.info(f"Exploration depth: {player.depth}")

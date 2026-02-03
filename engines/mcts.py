@@ -3,12 +3,15 @@
 from typing import Generator, Tuple
 import random
 import math
+import time
 import chess
 from engines.player import Player, GreedyPlayer
 import logging
 
 class MCTSPlayer(Player):
     """A player using Monte Carlo Tree Search."""
+
+    name = "MCTS" # Name of the player.
 
     def __init__(self, logger: logging.Logger | None, max_nodes: int = 1000):
         self.logger = logger
@@ -20,6 +23,30 @@ class MCTSPlayer(Player):
         for _ in range(self.max_nodes):
             root.explore(board)
         if self.logger is not None:
+            root.log_policy(self.logger, board)
+        return root.best_move(board)
+
+class TimedMCTSPlayer(Player):
+    """A player using Monte Carlo Tree Search with a fixed time budget for exploration."""
+
+    name = "Timed MCTS" # Name of the player.
+
+    def __init__(self, logger: logging.Logger | None, thinking_time: float = 1.0):
+        super().__init__()
+        self.logger = logger
+        # Time budget for exploration.
+        self.thinking_time = thinking_time
+
+    def move(self, board: chess.Board) -> chess.Move:
+        cutoff = time.time() + self.thinking_time
+        visited = 0
+        root = Node(board, 0)
+        while time.time() < cutoff and root.finished is None:
+            root.explore(board)
+            visited += 1
+        self.move_info = f"explored {visited} nodes"
+        if self.logger is not None:
+            self.logger.info(f"MCTS visited {visited} nodes in {self.thinking_time} seconds.")
             root.log_policy(self.logger, board)
         return root.best_move(board)
 

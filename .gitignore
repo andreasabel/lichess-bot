@@ -8,3 +8,5 @@ lichess_bot_auto_logs/*
 *.txt
 *~
 TEMP/*
+/token.sh
+/tournament.py

@@ -19,6 +19,21 @@ class MCTSPlayer(Player):
         self.max_nodes = max_nodes
 
     def move(self, board: chess.Board) -> chess.Move:
+        # If there is just one legal move, return it immediately.
+        moves = list(board.legal_moves)
+        n = len(moves)
+        if n == 1:
+            move = moves[0]
+            if self.logger is not None:
+                self.logger.info(f"Only legal move: {move}")
+            return move
+        else:
+            if self.logger is not None:
+                # Pretty print possible moves.
+                self.logger.info(f"{n} moves possible: {[board.san(m) for m in moves]}")
+        return self._move(board)
+
+    def _move(self, board: chess.Board) -> chess.Move:
         root = Node(board, 0)
         for _ in range(self.max_nodes):
             root.explore(board)
@@ -26,18 +41,18 @@ class MCTSPlayer(Player):
             root.log_policy(self.logger, board)
         return root.best_move(board)
 
-class TimedMCTSPlayer(Player):
+class TimedMCTSPlayer(MCTSPlayer):
     """A player using Monte Carlo Tree Search with a fixed time budget for exploration."""
 
     name = "Timed MCTS" # Name of the player.
 
     def __init__(self, logger: logging.Logger | None, thinking_time: float = 1.0):
-        super().__init__()
+        super().__init__(logger)
         self.logger = logger
         # Time budget for exploration.
         self.thinking_time = thinking_time
 
-    def move(self, board: chess.Board) -> chess.Move:
+    def _move(self, board: chess.Board) -> chess.Move:
         cutoff = time.time() + self.thinking_time
         visited = 0
         root = Node(board, 0)

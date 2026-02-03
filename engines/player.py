@@ -42,6 +42,12 @@ class RatedMoveSequence:
 class Player:
     """A player picking a move given a board."""
 
+    name = "FirstMove" # Name of the player.
+
+    def __init__(self):
+        # Free-form information about the move computed by the move() method.
+        self.move_info = ""
+
     def move(self, board: chess.Board) -> chess.Move:
         return next(board.generate_legal_moves())
 
@@ -65,6 +71,8 @@ class Player:
 class RandomPlayer(Player):
     """A player picking a random move."""
 
+    name = "Random" # Name of the player.
+
     def move(self, board: chess.Board) -> chess.Move:
         return random.choice(list(board.legal_moves))
 
@@ -72,7 +80,11 @@ class RandomPlayer(Player):
 class GreedyPlayer(Player):
     """A player picking a move that directly wins, or a move that does not directly lose."""
 
+    name = "Greedy" # Name of the player.
+
     def __init__(self):
+        super().__init__()
+        # Number of positions visited during the search.
         self.visited = 0
 
     def move(self, board: chess.Board) -> chess.Move:
